@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniBlox Studio — Аналог Roblox</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+    body { overflow: hidden; background: #0f172a; color: #f8fafc; user-select: none; }
+    .toolbar {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.92); border: 1px solid #334155;
+      padding: 8px 14px; border-radius: 14px; display: flex; gap: 8px; align-items: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 10; flex-wrap: wrap;
+    }
+    .btn {
+      background: #334155; color: #fff; border: none; padding: 8px 12px;
+      border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px;
+    }
+    .btn:hover { background: #475569; }
+    .btn.active { outline: 2px solid #38bdf8; background: #0284c7; }
+    .btn.play { background: #10b981; color: #052e16; }
+    .btn.stop { background: #ef4444; color: #fff; }
+    .hint {
+      position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.8); padding: 6px 14px; border-radius: 10px;
+      font-size: 13px; color: #cbd5e1; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <button id="modeBtn" class="btn play" onclick="toggleMode()">▶ Play (Играть)</button>
+    <button id="t-block" class="btn active" onclick="selectTool('block')">🟦 Блок</button>
+    <button id="t-lava" class="btn" onclick="selectTool('lava')">🟥 Лава</button>
+    <button id="t-jump" class="btn" onclick="selectTool('jump')">🟩 Батут</button>
+    <button id="t-win" class="btn" onclick="selectTool('win')">🟨 Финиш</button>
+    <button id="t-del" class="btn" onclick="selectTool('del')">🗑️ Удалить</button>
+    <button class="btn" style="background:#8b5cf6;" onclick="toggleCatalog()">🌐 Игры игроков</button>
+    <button class="btn" style="background:#059669;" onclick="hostOnlineRoom()">📡 Создать комнату</button>
+    <button class="btn" style="background:#2563eb;" onclick="joinOnlineRoom()">🔗 Войти к другу</button>
+    <button class="btn" style="background:#0284c7;" onclick="shareMapCode()">📤 Код карты</button>
+    <button class="btn" style="background:#0284c7;" onclick="importMapCode()">📥 Вставить код</button>
+
+    <button class="btn" onclick="clearMap()">🧹 Очистить</button>
+  </div>
+  <div id="catalogModal" style="display:none; position:fixed; inset:0; background:rgba(9,13,22,0.85); z-index:20; align-items:center; justify-content:center;">
+    <div style="background:#1e293b; border:1px solid #475569; border-radius:16px; padding:20px; width:90%; max-width:460px; box-shadow:0 20px 50px rgba(0,0,0,0.7);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="color:#38bdf8; font-size:20px;">🌐 Игры сообщества Rublox</h2>
+        <button class="btn stop" onclick="toggleCatalog()">✖</button>
+      </div>
+      <div id="gamesList" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto;"></div>
+      <div style="margin-top:14px; border-top:1px solid #334155; padding-top:12px; display:flex; gap:8px;">
+        <input id="newGameTitle" type="text" placeholder="Название твоей игры..." style="flex:1; padding:8px 12px; border-radius:8px; border:1px solid #475569; background:#0f172a; color:#fff;">
+        <button class="btn play" onclick="publishCurrentMap()">Опубликовать</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint" id="hintText">Режим Studio: <b>ЛКМ</b> — поставить блок | <b>ПКМ + мышь</b> — вращать камеру</div>
+
+  <script src="three.min.js"></script>
+  <script src="https://unpkg.com"
+          onerror="this.onerror=null;this.src='https://cloudflare.com';"></script>
+
+  <script>
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x38bdf8);
+    scene.fog = new THREE.Fog(0x38bdf8, 25, 80);
+
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 150);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const sun = new THREE.DirectionalLight(0xffffff, 1.3);
+    sun.position.set(15, 25, 15);
+    scene.add(sun);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+    const baseplate = new THREE.Mesh(
+      new THREE.BoxGeometry(40, 1, 40),
+      new THREE.MeshStandardMaterial({ color: 0x475569 })
+    );
+    baseplate.position.y = -0.5;
+    baseplate.userData.isBase = true;
+    scene.add(baseplate);
+
+    const gridHelper = new THREE.GridHelper(40, 20, 0x94a3b8, 0x64748b);
+    scene.add(gridHelper);
+
+    const avatar = new THREE.Group();
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.5), new THREE.MeshStandardMaterial({ color: 0x0284c7 }));
+    torso.position.y = 1.4;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+    head.position.y = 2.45;
+    const legL = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x16a34a }));
+    legL.position.set(-0.26, 0.4, 0);
+        const legR = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x16a34a }));
+    legR.position.set(0.26, 0.4, 0);
+
+    const armGeo = new THREE.BoxGeometry(0.4, 1.1, 0.4);
+    armGeo.translate(0, -0.45, 0); // Точка вращения в плече
+    const armMat = new THREE.MeshStandardMaterial({ color: 0xfacc15 });
+    const armL = new THREE.Mesh(armGeo, armMat);
+    armL.position.set(-0.75, 1.9, 0);
+    const armR = new THREE.Mesh(armGeo, armMat);
+    armR.position.set(0.75, 1.9, 0);
+
+    avatar.add(torso, head, legL, legR, armL, armR);
+    avatar.visible = false;
+    scene.add(avatar);
+
+    let parts = [];
+    let currentTool = "block";
+    let isPlaying = false;
+    let camYaw = 0.6, camPitch = 0.5, camDist = 18;
+    let isRightDrag = false;
+    let velY = 0, onGround = false;
+    let keys = {};
+
+    function getPartColor(type) {
+      if (type === "lava") return 0xef4444;
+      if (type === "jump") return 0x22c55e;
+      if (type === "win") return 0xfacc15;
+      return 0x3b82f6;
+    }
+
+    function selectTool(tool) {
+      currentTool = tool;
+      document.querySelectorAll(".toolbar .btn").forEach(b => b.classList.remove("active"));
+      const btn = document.getElementById("t-" + tool);
+      if (btn) btn.classList.add("active");
+    }
+
+    function addPart(x, y, z, type) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 1, 2),
+        new THREE.MeshStandardMaterial({ color: getPartColor(type) })
+      );
+      mesh.position.set(x, y, z);
+      mesh.userData = { type: type };
+      scene.add(mesh);
+      parts.push(mesh);
+    }
+
+    addPart(0, 0.5, -4, "block");
+    addPart(0, 1.5, -8, "jump");
+    addPart(0, 3.5, -14, "win");
+
+    function clearMap() {
+      parts.forEach(p => scene.remove(p));
+      parts = [];
+    }
+
+    function toggleMode() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById("modeBtn");
+      const hint = document.getElementById("hintText");
+      if (isPlaying) {
+        btn.textContent = "⏹ Stop (В Studio)";
+        btn.className = "btn stop";
+        hint.innerHTML = "Режим игры: <b>WASD</b> — бегать | <b>Пробел</b> — прыжок | <b>ПКМ + мышь</b> — камера";
+        avatar.position.set(0, 0, 2);
+        velY = 0;
+        avatar.visible = true;
+      } else {
+        btn.textContent = "▶ Play (Играть)";
+        btn.className = "btn play";
+        hint.innerHTML = "Режим Studio: <b>ЛКМ</b> — поставить блок | <b>ПКМ + мышь</b> — вращать камеру";
+        avatar.visible = false;
+      }
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    window.addEventListener("contextmenu", e => e.preventDefault());
+    window.addEventListener("mousedown", e => {
+      if (e.target.tagName === "BUTTON") return;
+      if (e.button === 2) { isRightDrag = true; return; }
+      if (e.button === 0 && !isPlaying) {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(Array.of(baseplate).concat(parts));
+        if (hits.length > 0) {
+          const hit = hits.at(0);
+          if (currentTool === "del") {
+            if (!hit.object.userData.isBase) {
+              scene.remove(hit.object);
+              parts = parts.filter(p => p !== hit.object);
+            }
+          } else {
+            const pos = hit.point.clone().addScaledVector(hit.face.normal, 0.5);
+            const gx = Math.round(pos.x / 2) * 2;
+            const gy = Math.max(0.5, Math.floor(pos.y) + 0.5);
+            const gz = Math.round(pos.z / 2) * 2;
+            addPart(gx, gy, gz, currentTool);
+          }
+        }
+      }
+    });
+
+    window.addEventListener("mouseup", e => { if (e.button === 2) isRightDrag = false; });
+    window.addEventListener("mousemove", e => {
+      if (isRightDrag) {
+        camYaw -= e.movementX * 0.006;
+        camPitch = Math.max(0.15, Math.min(1.4, camPitch + e.movementY * 0.006));
+      }
+    });
+
+    window.addEventListener("keydown", e => keys[e.code] = true);
+    window.addEventListener("keyup", e => keys[e.code] = false);
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (isPlaying) {
+        const speed = 0.14;
+        let moveX = 0, moveZ = 0;
+        if (keys["KeyW"] || keys["ArrowUp"]) { moveX -= Math.sin(camYaw); moveZ -= Math.cos(camYaw); }
+        if (keys["KeyS"] || keys["ArrowDown"]) { moveX += Math.sin(camYaw); moveZ += Math.cos(camYaw); }
+        if (keys["KeyA"] || keys["ArrowLeft"]) { moveX -= Math.cos(camYaw); moveZ += Math.sin(camYaw); }
+        if (keys["KeyD"] || keys["ArrowRight"]) { moveX += Math.cos(camYaw); moveZ -= Math.sin(camYaw); }
+
+                let isMoving = false;
+        if (moveX !== 0 || moveZ !== 0) {
+          isMoving = true;
+          const len = Math.hypot(moveX, moveZ);
+          avatar.position.x += (moveX / len) * speed;
+          avatar.position.z += (moveZ / len) * speed;
+          avatar.rotation.y = Math.atan2(moveX, moveZ);
+        }
+
+        // R6-анимация рук и ног
+        if (!onGround) {
+          // В прыжке руки поднимаются вверх как в классическом Roblox
+          armL.rotation.x = Math.PI * 0.85;
+          armR.rotation.x = Math.PI * 0.85;
+          legL.rotation.x = 0.25;
+          legR.rotation.x = -0.25;
+        } else if (isMoving) {
+          // Размах руками и ногами при беге
+          const swing = Math.sin(Date.now() * 0.015) * 0.85;
+          legL.rotation.x = swing;
+          legR.rotation.x = -swing;
+          armL.rotation.x = -swing;
+          armR.rotation.x = swing;
+        } else {
+          // Спокойная стойка с лёгким дыханием
+          legL.rotation.x = 0;
+          legR.rotation.x = 0;
+          armL.rotation.x = Math.sin(Date.now() * 0.003) * 0.06;
+          armR.rotation.x = -Math.sin(Date.now() * 0.003) * 0.06;
+        }
+
+
+        if (keys["Space"] && onGround) { velY = 0.24; onGround = false; }
+        velY -= 0.012;
+        avatar.position.y += velY;
+        onGround = false;
+
+        if (avatar.position.y <= 0) {
+          avatar.position.y = 0;
+          velY = 0;
+          onGround = true;
+        }
+
+        for (let p of parts) {
+          const dx = Math.abs(avatar.position.x - p.position.x);
+          const dz = Math.abs(avatar.position.z - p.position.z);
+          const topY = p.position.y + 0.5;
+          if (dx < 1.2 && dz < 1.2 && avatar.position.y <= topY && avatar.position.y >= p.position.y - 0.6 && velY <= 0) {
+            if (p.userData.type === "lava") {
+              avatar.position.set(0, 0, 2);
+              velY = 0;
+            } else if (p.userData.type === "jump") {
+              velY = 0.42;
+            } else if (p.userData.type === "win") {
+              alert("🏆 Ты прошёл Obby-уровень!");
+              avatar.position.set(0, 0, 2);
+            } else {
+              avatar.position.y = topY;
+              velY = 0;
+              onGround = true;
+            }
+          }
+        }
+
+        const target = avatar.position.clone().add(new THREE.Vector3(0, 1.8, 0));
+        camera.position.set(
+          target.x + Math.sin(camYaw) * Math.cos(camPitch) * 10,
+          target.y + Math.sin(camPitch) * 10,
+          target.z + Math.cos(camYaw) * Math.cos(camPitch) * 10
+        );
+        camera.lookAt(target);
+      } else {
+        camera.position.set(
+          Math.sin(camYaw) * Math.cos(camPitch) * camDist,
+          Math.sin(camPitch) * camDist,
+          Math.cos(camYaw) * Math.cos(camPitch) * camDist
+        );
+        camera.lookAt(0, 0, 0);
+      }
+
+      renderer.render(scene, camera);
+    }
+    // Встроенные игры других игроков + сохранённые пользователем
+    const defaultCommunityGames = Array.of(
+      {
+        title: "🔥 Лавовый Прыжок",
+        author: "Sasha_Pro",
+        blocks: Array.of(
+          {x:0,y:0.5,z:-4,t:"block"}, {x:0,y:0.5,z:-6,t:"lava"}, {x:0,y:0.5,z:-8,t:"block"},
+          {x:2,y:1.5,z:-10,t:"block"}, {x:4,y:2.5,z:-12,t:"jump"}, {x:4,y:4.5,z:-18,t:"win"}
+        )
+      },
+      {
+        title: "🚀 Башня Батутов",
+        author: "VanyaPlay",
+        blocks: Array.of(
+          {x:0,y:0.5,z:-4,t:"jump"}, {x:0,y:2.5,z:-10,t:"jump"}, {x:0,y:4.5,z:-16,t:"jump"},
+          {x:0,y:6.5,z:-22,t:"win"}
+        )
+      },
+      {
+        title: "🌀 Змейка над пропастью",
+        author: "Artem_Dev",
+        blocks: Array.of(
+          {x:0,y:0.5,z:-4,t:"block"}, {x:2,y:0.5,z:-6,t:"block"}, {x:4,y:0.5,z:-8,t:"block"},
+          {x:2,y:1.5,z:-10,t:"block"}, {x:0,y:1.5,z:-12,t:"lava"}, {x:-2,y:1.5,z:-12,t:"block"},
+          {x:-2,y:2.5,z:-16,t:"win"}
+        )
+      }
+    );
+
+    function getSavedGames() {
+      try {
+        const raw = localStorage.getItem("rublox_games");
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) { return []; }
+    }
+
+    function toggleCatalog() {
+      const modal = document.getElementById("catalogModal");
+      const isOpen = modal.style.display === "flex";
+      modal.style.display = isOpen ? "none" : "flex";
+      if (!isOpen) renderCatalog();
+    }
+
+    function renderCatalog() {
+      const list = document.getElementById("gamesList");
+      list.innerHTML = "";
+      const allGames = defaultCommunityGames.concat(getSavedGames());
+
+      allGames.forEach((g) => {
+        const card = document.createElement("div");
+        card.style.cssText = "background:#0f172a; border:1px solid #334155; padding:10px 14px; border-radius:10px; display:flex; justify-content:space-between; align-items:center;";
+        card.innerHTML = `<div><b style="color:#f8fafc;">${g.title}</b><br><span style="font-size:12px; color:#94a3b8;">Автор: ${g.author} • Блоков: ${g.blocks.length}</span></div>`;
+
+        const playBtn = document.createElement("button");
+        playBtn.className = "btn play";
+        playBtn.textContent = "▶ Играть";
+        playBtn.onclick = () => {
+          loadBlocksArray(g.blocks);
+          toggleCatalog();
+          if (!isPlaying) toggleMode();
+        };
+        card.appendChild(playBtn);
+        list.appendChild(card);
+      });
+    }
+
+    function loadBlocksArray(blocksArr) {
+      clearMap();
+      blocksArr.forEach(b => addPart(b.x, b.y, b.z, b.t));
+      avatar.position.set(0, 0, 2);
+      velY = 0;
+    }
+
+    function publishCurrentMap() {
+      const titleInput = document.getElementById("newGameTitle");
+      const title = titleInput.value.trim() || "Без названия";
+      if (parts.length === 0) {
+        alert("Сначала поставь хотя бы один блок на карту!");
+        return;
+      }
+      const blocksData = parts.map(p => ({ x: p.position.x, y: p.position.y, z: p.position.z, t: p.userData.type }));
+      const saved = getSavedGames();
+      saved.unshift({ title: "⭐ " + title, author: "Ты", blocks: blocksData });
+      localStorage.setItem("rublox_games", JSON.stringify(saved));
+      titleInput.value = "";
+      renderCatalog();
+    }
+
+    function shareMapCode() {
+      if (parts.length === 0) { alert("Карта пустая!"); return; }
+      const compact = parts.map(p => `${p.position.x},${p.position.y},${p.position.z},${p.userData.type}`).join(";");
+      navigator.clipboard?.writeText(compact);
+      prompt("Скопируй этот код карты и отправь другу в чат:", compact);
+    }
+
+    function importMapCode() {
+      const code = prompt("Вставь код карты, который прислал друг:");
+      if (!code) return;
+      try {
+        const parsed = code.split(";").map(item => {
+          const d = item.split(",");
+          return { x: Number(d.at(0)), y: Number(d.at(1)), z: Number(d.at(2)), t: d.at(3) || "block" };
+        });
+        loadBlocksArray(parsed);
+        alert("✅ Карта друга загружена! Нажми Play, чтобы пройти её.");
+      } catch (e) {
+        alert("⚠️ Неверный формат кода карты.");
+      }
+    }
+    // Настоящий онлайн-мультиплеер через PeerJS
+    let peer = null;
+    let conn = null;
+    let friendAvatar = null;
+
+    function createFriendMesh(name) {
+      if (friendAvatar) return friendAvatar;
+      const g = new THREE.Group();
+      const t = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.5), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+      t.position.y = 1.4;
+      const h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+      h.position.y = 2.45;
+      const l1 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+      l1.position.set(-0.26, 0.4, 0);
+      const l2 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+      l2.position.set(0.26, 0.4, 0);
+
+      // Ник над головой друга
+      const c = document.createElement("canvas");
+      c.width = 256; c.height = 64;
+      const ctx2 = c.getContext("2d");
+      ctx2.fillStyle = "rgba(15, 23, 42, 0.8)";
+      ctx2.fillRect(20, 12, 216, 40);
+      ctx2.fillStyle = "#38bdf8";
+      ctx2.font = "bold 24px sans-serif";
+      ctx2.textAlign = "center";
+      ctx2.fillText(name, 128, 40);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c) }));
+      sprite.scale.set(2.8, 0.7, 1);
+      sprite.position.y = 3.35;
+
+      g.add(t, h, l1, l2, sprite);
+      scene.add(g);
+      friendAvatar = g;
+      return g;
+    }
+
+    function setupConnection(connection) {
+      conn = connection;
+      const friendMesh = createFriendMesh("Друг Онлайн");
+
+      conn.on("data", (data) => {
+        if (data.type === "move") {
+          friendMesh.position.set(data.x, data.y, data.z);
+          friendMesh.rotation.y = data.ry;
+        }
+        if (data.type === "map" && typeof loadBlocksArray === "function") {
+          loadBlocksArray(data.blocks);
+        }
+      });
+
+      conn.on("open", () => {
+        alert("🎉 Друг подключился к игре!");
+        if (!isPlaying) toggleMode();
+        // Отправляем другу текущую карту
+        const blocksData = parts.map(p => ({ x: p.position.x, y: p.position.y, z: p.position.z, t: p.userData.type }));
+        conn.send({ type: "map", blocks: blocksData });
+      });
+    }
+
+    function hostOnlineRoom() {
+      if (typeof Peer === "undefined") {
+        alert("⚠️ Библиотека PeerJS не загрузилась. Скачай peerjs.min.js в папку Rublox!");
+        return;
+      }
+      const roomCode = "rublox-" + Math.floor(1000 + Math.random() * 9000);
+      peer = new Peer(roomCode);
+      peer.on("open", (id) => {
+        navigator.clipboard?.writeText(id);
+        prompt("Комната создана! Скопируй код и отправь другу:", id);
+      });
+      peer.on("connection", (connection) => {
+        setupConnection(connection);
+      });
+    }
+
+    function joinOnlineRoom() {
+      if (typeof Peer === "undefined") {
+        alert("⚠️ Библиотека PeerJS не загрузилась. Скачай peerjs.min.js в папку Rublox!");
+        return;
+      }
+      const roomCode = prompt("Введи код комнаты друга (например, rublox-1234):");
+      if (!roomCode) return;
+      peer = new Peer();
+      peer.on("open", () => {
+        const connection = peer.connect(roomCode.trim());
+        setupConnection(connection);
+      });
+    }
+
+    // Отправка твоих координат другу 30 раз в секунду
+    setInterval(() => {
+      if (conn && conn.open && isPlaying) {
+        conn.send({
+          type: "move",
+          x: avatar.position.x,
+          y: avatar.position.y,
+          z: avatar.position.z,
+          ry: avatar.rotation.y
+        });
+      }
+    }, 33);
+
+    animate();
+  </script>
+</body>
+</html>
