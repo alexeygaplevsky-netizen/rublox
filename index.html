@@ -62,7 +62,7 @@
   <div class="hint" id="hintText">Режим Studio: <b>ЛКМ</b> — поставить блок | <b>ПКМ + мышь</b> — вращать камеру</div>
 
   <script src="three.min.js"></script>
-  <script src="https://unpkg.com"
+  <script src="peerjs.min.js"></script>
           onerror="this.onerror=null;this.src='https://cloudflare.com';"></script>
 
   <script>
@@ -366,6 +366,7 @@
         playBtn.textContent = "▶ Играть";
         playBtn.onclick = () => {
           loadBlocksArray(g.blocks);
+autoJoinTopGame(game.name || "default");
           toggleCatalog();
           if (!isPlaying) toggleMode();
         };
@@ -379,6 +380,8 @@
       blocksArr.forEach(b => addPart(b.x, b.y, b.z, b.t));
       avatar.position.set(0, 0, 2);
       velY = 0;
+autoJoinTopGame(game.name || "default");
+s
     }
 
     function publishCurrentMap() {
@@ -519,6 +522,36 @@
         });
       }
     }, 33);
+    // Автоматическая встреча двух игроков в одной карте из топа
+    function autoJoinTopGame(gameId) {
+      if (typeof Peer === "undefined") return;
+      if (peer) { try { peer.destroy(); } catch (e) {} }
+
+      // Превращаем название игры в чистый сетевой ID комнаты
+      const cleanRoomId = "rublox-top-" + String(gameId).toLowerCase().replace(/[^a-z0-9]/g, "") + "-1";
+
+      // 1. Пробуем стать первым игроком (создать комнату карты)
+      peer = new Peer(cleanRoomId);
+
+      peer.on("open", () => {
+        console.log("Ждём второго игрока в комнате:", cleanRoomId);
+      });
+
+      peer.on("connection", (connection) => {
+        setupConnection(connection);
+      });
+
+      // 2. Если ошибка 'unavailable-id' — значит, первый игрок уже внутри! Подключаемся к нему!
+      peer.on("error", (err) => {
+        if (err.type === "unavailable-id") {
+          peer = new Peer();
+          peer.on("open", () => {
+            const connection = peer.connect(cleanRoomId);
+            setupConnection(connection);
+          });
+        }
+      });
+    }
 
     animate();
   </script>
