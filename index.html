@@ -23,8 +23,8 @@
     .btn.stop { background: #ef4444; color: #fff; }
     .hint {
       position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.8); padding: 6px 14px; border-radius: 10px;
-      font-size: 13px; color: #cbd5e1; pointer-events: none;
+      background: rgba(15, 23, 42, 0.85); padding: 6px 14px; border-radius: 10px;
+      font-size: 13px; color: #cbd5e1; pointer-events: none; z-index: 10;
     }
   </style>
 </head>
@@ -42,9 +42,9 @@
     <button class="btn" style="background:#2563eb;" onclick="joinOnlineRoom()">🔗 Войти к другу</button>
     <button class="btn" style="background:#0284c7;" onclick="shareMapCode()">📤 Код карты</button>
     <button class="btn" style="background:#0284c7;" onclick="importMapCode()">📥 Вставить код</button>
-
     <button class="btn" onclick="clearMap()">🧹 Очистить</button>
   </div>
+
   <div id="catalogModal" style="display:none; position:fixed; inset:0; background:rgba(9,13,22,0.85); z-index:20; align-items:center; justify-content:center;">
     <div style="background:#1e293b; border:1px solid #475569; border-radius:16px; padding:20px; width:90%; max-width:460px; box-shadow:0 20px 50px rgba(0,0,0,0.7);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
@@ -63,7 +63,6 @@
 
   <script src="three.min.js"></script>
   <script src="peerjs.min.js"></script>
-          onerror="this.onerror=null;this.src='https://cloudflare.com';"></script>
 
   <script>
     const scene = new THREE.Scene();
@@ -98,11 +97,11 @@
     head.position.y = 2.45;
     const legL = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x16a34a }));
     legL.position.set(-0.26, 0.4, 0);
-        const legR = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x16a34a }));
+    const legR = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x16a34a }));
     legR.position.set(0.26, 0.4, 0);
 
     const armGeo = new THREE.BoxGeometry(0.4, 1.1, 0.4);
-    armGeo.translate(0, -0.45, 0); // Точка вращения в плече
+    armGeo.translate(0, -0.45, 0);
     const armMat = new THREE.MeshStandardMaterial({ color: 0xfacc15 });
     const armL = new THREE.Mesh(armGeo, armMat);
     armL.position.set(-0.75, 1.9, 0);
@@ -112,7 +111,6 @@
     avatar.add(torso, head, legL, legR, armL, armR);
     avatar.visible = false;
     scene.add(avatar);
-
     let parts = [];
     let currentTool = "block";
     let isPlaying = false;
@@ -185,9 +183,9 @@
         mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(Array.of(baseplate).concat(parts));
+        const hits = raycaster.intersectObjects([baseplate].concat(parts));
         if (hits.length > 0) {
-          const hit = hits.at(0);
+          const hit = hits[0];
           if (currentTool === "del") {
             if (!hit.object.userData.isBase) {
               scene.remove(hit.object);
@@ -226,7 +224,7 @@
         if (keys["KeyA"] || keys["ArrowLeft"]) { moveX -= Math.cos(camYaw); moveZ += Math.sin(camYaw); }
         if (keys["KeyD"] || keys["ArrowRight"]) { moveX += Math.cos(camYaw); moveZ -= Math.sin(camYaw); }
 
-                let isMoving = false;
+        let isMoving = false;
         if (moveX !== 0 || moveZ !== 0) {
           isMoving = true;
           const len = Math.hypot(moveX, moveZ);
@@ -235,28 +233,23 @@
           avatar.rotation.y = Math.atan2(moveX, moveZ);
         }
 
-        // R6-анимация рук и ног
         if (!onGround) {
-          // В прыжке руки поднимаются вверх как в классическом Roblox
           armL.rotation.x = Math.PI * 0.85;
           armR.rotation.x = Math.PI * 0.85;
           legL.rotation.x = 0.25;
           legR.rotation.x = -0.25;
         } else if (isMoving) {
-          // Размах руками и ногами при беге
           const swing = Math.sin(Date.now() * 0.015) * 0.85;
           legL.rotation.x = swing;
           legR.rotation.x = -swing;
           armL.rotation.x = -swing;
           armR.rotation.x = swing;
         } else {
-          // Спокойная стойка с лёгким дыханием
           legL.rotation.x = 0;
           legR.rotation.x = 0;
           armL.rotation.x = Math.sin(Date.now() * 0.003) * 0.06;
           armR.rotation.x = -Math.sin(Date.now() * 0.003) * 0.06;
         }
-
 
         if (keys["Space"] && onGround) { velY = 0.24; onGround = false; }
         velY -= 0.012;
@@ -308,34 +301,33 @@
 
       renderer.render(scene, camera);
     }
-    // Встроенные игры других игроков + сохранённые пользователем
-    const defaultCommunityGames = Array.of(
+    const defaultCommunityGames = [
       {
         title: "🔥 Лавовый Прыжок",
         author: "Sasha_Pro",
-        blocks: Array.of(
+        blocks: [
           {x:0,y:0.5,z:-4,t:"block"}, {x:0,y:0.5,z:-6,t:"lava"}, {x:0,y:0.5,z:-8,t:"block"},
           {x:2,y:1.5,z:-10,t:"block"}, {x:4,y:2.5,z:-12,t:"jump"}, {x:4,y:4.5,z:-18,t:"win"}
-        )
+        ]
       },
       {
         title: "🚀 Башня Батутов",
         author: "VanyaPlay",
-        blocks: Array.of(
+        blocks: [
           {x:0,y:0.5,z:-4,t:"jump"}, {x:0,y:2.5,z:-10,t:"jump"}, {x:0,y:4.5,z:-16,t:"jump"},
           {x:0,y:6.5,z:-22,t:"win"}
-        )
+        ]
       },
       {
         title: "🌀 Змейка над пропастью",
         author: "Artem_Dev",
-        blocks: Array.of(
+        blocks: [
           {x:0,y:0.5,z:-4,t:"block"}, {x:2,y:0.5,z:-6,t:"block"}, {x:4,y:0.5,z:-8,t:"block"},
           {x:2,y:1.5,z:-10,t:"block"}, {x:0,y:1.5,z:-12,t:"lava"}, {x:-2,y:1.5,z:-12,t:"block"},
           {x:-2,y:2.5,z:-16,t:"win"}
-        )
+        ]
       }
-    );
+    ];
 
     function getSavedGames() {
       try {
@@ -366,9 +358,9 @@
         playBtn.textContent = "▶ Играть";
         playBtn.onclick = () => {
           loadBlocksArray(g.blocks);
-autoJoinTopGame(game.name || "default");
           toggleCatalog();
           if (!isPlaying) toggleMode();
+          autoJoinTopGame(g.title);
         };
         card.appendChild(playBtn);
         list.appendChild(card);
@@ -380,8 +372,6 @@ autoJoinTopGame(game.name || "default");
       blocksArr.forEach(b => addPart(b.x, b.y, b.z, b.t));
       avatar.position.set(0, 0, 2);
       velY = 0;
-autoJoinTopGame(game.name || "default");
-s
     }
 
     function publishCurrentMap() {
@@ -412,7 +402,7 @@ s
       try {
         const parsed = code.split(";").map(item => {
           const d = item.split(",");
-          return { x: Number(d.at(0)), y: Number(d.at(1)), z: Number(d.at(2)), t: d.at(3) || "block" };
+          return { x: Number(d[0]), y: Number(d[1]), z: Number(d[2]), t: d[3] || "block" };
         });
         loadBlocksArray(parsed);
         alert("✅ Карта друга загружена! Нажми Play, чтобы пройти её.");
@@ -420,10 +410,14 @@ s
         alert("⚠️ Неверный формат кода карты.");
       }
     }
+
     // Настоящий онлайн-мультиплеер через PeerJS
     let peer = null;
     let conn = null;
     let friendAvatar = null;
+    const peerConfig = {
+      config: { iceServers: [{ urls: "stun:://google.com" }, { urls: "stun:://google.com" }] }
+    };
 
     function createFriendMesh(name) {
       if (friendAvatar) return friendAvatar;
@@ -437,7 +431,6 @@ s
       const l2 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
       l2.position.set(0.26, 0.4, 0);
 
-      // Ник над головой друга
       const c = document.createElement("canvas");
       c.width = 256; c.height = 64;
       const ctx2 = c.getContext("2d");
@@ -463,6 +456,7 @@ s
 
       conn.on("data", (data) => {
         if (data.type === "move") {
+          friendMesh.visible = true;
           friendMesh.position.set(data.x, data.y, data.z);
           friendMesh.rotation.y = data.ry;
         }
@@ -472,9 +466,9 @@ s
       });
 
       conn.on("open", () => {
-        alert("🎉 Друг подключился к игре!");
+        friendMesh.visible = true;
+        document.getElementById("hintText").innerHTML = "🎉 <b>Друг подключился к игре!</b> Отойди чуть в сторону, чтобы увидеть его!";
         if (!isPlaying) toggleMode();
-        // Отправляем другу текущую карту
         const blocksData = parts.map(p => ({ x: p.position.x, y: p.position.y, z: p.position.z, t: p.userData.type }));
         conn.send({ type: "map", blocks: blocksData });
       });
@@ -482,35 +476,34 @@ s
 
     function hostOnlineRoom() {
       if (typeof Peer === "undefined") {
-        alert("⚠️ Библиотека PeerJS не загрузилась. Скачай peerjs.min.js в папку Rublox!");
+        alert("⚠️ Библиотека PeerJS не загрузилась. Проверь файл peerjs.min.js!");
         return;
       }
+      if (peer) { try { peer.destroy(); } catch (e) {} }
       const roomCode = "rublox-" + Math.floor(1000 + Math.random() * 9000);
-      peer = new Peer(roomCode);
+      peer = new Peer(roomCode, peerConfig);
       peer.on("open", (id) => {
         navigator.clipboard?.writeText(id);
         prompt("Комната создана! Скопируй код и отправь другу:", id);
       });
-      peer.on("connection", (connection) => {
-        setupConnection(connection);
-      });
+      peer.on("connection", (connection) => setupConnection(connection));
     }
 
     function joinOnlineRoom() {
       if (typeof Peer === "undefined") {
-        alert("⚠️ Библиотека PeerJS не загрузилась. Скачай peerjs.min.js в папку Rublox!");
+        alert("⚠️ Библиотека PeerJS не загрузилась. Проверь файл peerjs.min.js!");
         return;
       }
       const roomCode = prompt("Введи код комнаты друга (например, rublox-1234):");
       if (!roomCode) return;
-      peer = new Peer();
+      if (peer) { try { peer.destroy(); } catch (e) {} }
+      peer = new Peer(peerConfig);
       peer.on("open", () => {
         const connection = peer.connect(roomCode.trim());
         setupConnection(connection);
       });
     }
 
-    // Отправка твоих координат другу 30 раз в секунду
     setInterval(() => {
       if (conn && conn.open && isPlaying) {
         conn.send({
@@ -522,29 +515,26 @@ s
         });
       }
     }, 33);
-    // Автоматическая встреча двух игроков в одной карте из топа
-    function autoJoinTopGame(gameId) {
+
+    // Автоматическая встреча двух игроков в любой карте из топа
+    function autoJoinTopGame(gameTitle) {
       if (typeof Peer === "undefined") return;
       if (peer) { try { peer.destroy(); } catch (e) {} }
 
-      // Превращаем название игры в чистый сетевой ID комнаты
-      const cleanRoomId = "rublox-top-" + String(gameId).toLowerCase().replace(/[^a-z0-9]/g, "") + "-1";
+      const safeId = btoa(unescape(encodeURIComponent(String(gameTitle)))).replace(/[^a-zA-Z0-9]/g, "").slice(0, 20);
+      const cleanRoomId = "rublox-top-" + safeId + "-1";
 
-      // 1. Пробуем стать первым игроком (создать комнату карты)
-      peer = new Peer(cleanRoomId);
+      peer = new Peer(cleanRoomId, peerConfig);
 
       peer.on("open", () => {
-        console.log("Ждём второго игрока в комнате:", cleanRoomId);
+        document.getElementById("hintText").innerHTML = "📡 Ты первый в игре <b>" + gameTitle + "</b> — ждём второго игрока...";
       });
 
-      peer.on("connection", (connection) => {
-        setupConnection(connection);
-      });
+      peer.on("connection", (connection) => setupConnection(connection));
 
-      // 2. Если ошибка 'unavailable-id' — значит, первый игрок уже внутри! Подключаемся к нему!
       peer.on("error", (err) => {
         if (err.type === "unavailable-id") {
-          peer = new Peer();
+          peer = new Peer(peerConfig);
           peer.on("open", () => {
             const connection = peer.connect(cleanRoomId);
             setupConnection(connection);
