@@ -25,6 +25,20 @@
       background: #064e3b; border: 1px solid #10b981; color: #6ee7b7;
       padding: 6px 10px; border-radius: 8px; font-weight: bold; font-size: 13px;
     }
+    .chat-box {
+      position: absolute; bottom: 52px; left: 14px; width: 290px;
+      background: rgba(15, 23, 42, 0.85); border: 1px solid #334155;
+      border-radius: 12px; padding: 10px; z-index: 15; display: flex; flex-direction: column; gap: 6px;
+    }
+    .chat-messages {
+      height: 120px; overflow-y: auto; font-size: 13px; color: #e2e8f0;
+      display: flex; flex-direction: column; gap: 4px; word-break: break-word;
+    }
+    .chat-input-row { display: flex; gap: 6px; }
+    .chat-input-row input {
+      flex: 1; background: #0f172a; border: 1px solid #475569; color: #fff;
+      padding: 6px 8px; border-radius: 6px; font-size: 13px;
+    }
     .hint {
       position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
       background: rgba(15, 23, 42, 0.85); padding: 6px 14px; border-radius: 10px;
@@ -64,12 +78,22 @@
     </div>
   </div>
 
+  <div class="chat-box">
+    <div class="chat-messages" id="chatMessages">
+      <div style="color:#38bdf8;">💬 <b>Чат комнаты готов!</b> Нажми Enter, чтобы написать.</div>
+    </div>
+    <div class="chat-input-row">
+      <input id="chatInput" type="text" placeholder="Написать в чат..." maxlength="80" onkeydown="if(event.key==='Enter') sendChatMessage()">
+      <button class="btn play" style="padding:6px 10px;" onclick="sendChatMessage()">➤</button>
+    </div>
+  </div>
+
   <div class="hint" id="hintText">Режим Studio: <b>ЛКМ</b> — поставить блок | <b>ПКМ + мышь</b> — вращать камеру</div>
 
   <script src="three.min.js"></script>
 
   <script>
-    const DB_URL = "https://bloxag-default-rtdb.firebaseio.com";
+    const DB_URL = "https://" + "://firebaseio.com";
     const myPlayerId = "p_" + Math.random().toString(36).slice(2, 10);
     let currentRoomId = "lobby";
 
@@ -185,7 +209,7 @@
 
     window.addEventListener("contextmenu", e => e.preventDefault());
     window.addEventListener("mousedown", e => {
-      if (e.target.tagName === "BUTTON") return;
+      if (e.target.tagName === "BUTTON" || e.target.tagName === "INPUT") return;
       if (e.button === 2) { isRightDrag = true; return; }
       if (e.button === 0 && !isPlaying) {
         mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -218,7 +242,10 @@
       }
     });
 
-    window.addEventListener("keydown", e => keys[e.code] = true);
+    window.addEventListener("keydown", e => {
+      if (document.activeElement.tagName === "INPUT") return;
+      keys[e.code] = true;
+    });
     window.addEventListener("keyup", e => keys[e.code] = false);
 
     function animate() {
@@ -371,7 +398,8 @@
           if (!isPlaying) toggleMode();
           const safeRoom = "top_" + btoa(unescape(encodeURIComponent(g.title))).replace(/[^a-zA-Z0-9]/g, "").slice(0, 18);
           currentRoomId = safeRoom;
-          document.getElementById("hintText").innerHTML = `🌐 Вы в игре <b>${g.title}</b> — другие игроки здесь видны автоматически!`;
+          lastChatCount = 0;
+          document.getElementById("hintText").innerHTML = `🌐 Вы в игре <b>${g.title}</b> — другие игроки и чат работают автоматически!`;
         };
         card.appendChild(playBtn);
         list.appendChild(card);
@@ -427,8 +455,9 @@
       }
     }
 
-    // ===== ОБЛАЧНЫЙ МУЛЬТИПЛЕЕР И СЧЁТЧИК ОНЛАЙНА FIREBASE =====
+    // ===== ОБЛАЧНЫЙ МУЛЬТИПЛЕЕР, АНИМАЦИЯ И ЧАТ FIREBASE =====
     let friendAvatar = null;
+    let lastChatCount = 0;
 
     function createFriendMesh(name) {
       if (friendAvatar) return friendAvatar;
@@ -437,10 +466,22 @@
       t.position.y = 1.4;
       const h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
       h.position.y = 2.45;
-      const l1 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-      l1.position.set(-0.26, 0.4, 0);
-      const l2 = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.8, 0.45), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-      l2.position.set(0.26, 0.4, 0);
+
+      const legGeo = new THREE.BoxGeometry(0.45, 0.8, 0.45);
+      legGeo.translate(0, -0.4, 0);
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+      const l1 = new THREE.Mesh(legGeo, legMat);
+      l1.position.set(-0.26, 0.8, 0);
+      const l2 = new THREE.Mesh(legGeo, legMat);
+      l2.position.set(0.26, 0.8, 0);
+
+      const fArmGeo = new THREE.BoxGeometry(0.4, 1.1, 0.4);
+      fArmGeo.translate(0, -0.45, 0);
+      const fArmMat = new THREE.MeshStandardMaterial({ color: 0xfacc15 });
+      const fArmL = new THREE.Mesh(fArmGeo, fArmMat);
+      fArmL.position.set(-0.75, 1.9, 0);
+      const fArmR = new THREE.Mesh(fArmGeo, fArmMat);
+      fArmR.position.set(0.75, 1.9, 0);
 
       const c = document.createElement("canvas");
       c.width = 256; c.height = 64;
@@ -455,7 +496,8 @@
       sprite.scale.set(2.8, 0.7, 1);
       sprite.position.y = 3.35;
 
-      g.add(t, h, l1, l2, sprite);
+      g.add(t, h, l1, l2, fArmL, fArmR, sprite);
+      g.userData = { l1, l2, fArmL, fArmR, lastX: 0, lastZ: 0 };
       scene.add(g);
       friendAvatar = g;
       return g;
@@ -464,6 +506,7 @@
     async function hostOnlineRoom() {
       const roomCode = "rublox-" + Math.floor(1000 + Math.random() * 9000);
       currentRoomId = roomCode;
+      lastChatCount = 0;
       const blocksData = parts.map(p => ({ x: p.position.x, y: p.position.y, z: p.position.z, t: p.userData.type }));
       await fetch(`${DB_URL}/rooms/${roomCode}/map.json`, { method: "PUT", body: JSON.stringify(blocksData) });
       if (!isPlaying) toggleMode();
@@ -475,6 +518,7 @@
       const roomCode = prompt("Введи код комнаты друга (например, rublox-1234):");
       if (!roomCode) return;
       currentRoomId = roomCode.trim();
+      lastChatCount = 0;
       try {
         const res = await fetch(`${DB_URL}/rooms/${currentRoomId}/map.json`);
         const mapData = await res.json();
@@ -483,7 +527,19 @@
       } catch (e) {}
     }
 
-    // Обмен координатами и живой подсчёт онлайна (каждые 250 мс)
+    async function sendChatMessage() {
+      const input = document.getElementById("chatInput");
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      try {
+        await fetch(`${DB_URL}/rooms/${currentRoomId}/chat.json`, {
+          method: "POST",
+          body: JSON.stringify({ sender: myPlayerId.slice(2, 6).toUpperCase(), text: text, ts: Date.now() })
+        });
+      } catch (e) {}
+    }
+
     setInterval(async () => {
       const now = Date.now();
       try {
@@ -491,31 +547,64 @@
           method: "PUT",
           body: JSON.stringify({ room: currentRoomId, x: avatar.position.x, y: avatar.position.y, z: avatar.position.z, ry: avatar.rotation.y, playing: isPlaying, ts: now })
         });
+
         const res = await fetch(`${DB_URL}/online.json`);
         const all = await res.json();
         if (all) {
           const active = Object.entries(all).filter(([id, p]) => p && (now - p.ts < 8000));
           document.getElementById("onlineCounter").textContent = `🟢 Онлайн: ${active.length}`;
 
-          const other = active.find(([id, p]) => id !== myPlayerId && p.room === currentRoomId);
-          if (other) {
+          const otherEntry = active.find(([id, p]) => id !== myPlayerId && p.room === currentRoomId);
+          if (otherEntry) {
+            const pData = otherEntry[1];
             const f = createFriendMesh("Друг Онлайн");
             f.visible = true;
-            f.position.set(other[1].x, other[1].y, other[1].z);
-            f.rotation.y = other[1].ry;
-          } else if (friendAvatar) {
-            friendAvatar.visible = false;
-          }
-        }
-      } catch (e) {}
-    }, 250);
 
-    window.addEventListener("beforeunload", () => {
-      navigator.sendBeacon?.(`${DB_URL}/online/${myPlayerId}.json`, "");
-    });
+            const distMoved = Math.hypot(pData.x - f.userData.lastX, pData.z - f.userData.lastZ);
+            f.userData.lastX = pData.x;
+            f.userData.lastZ = pData.z;
 
-    animate();
+            if (pData.y > 0.15 && distMoved < 0.05) {
+              f.userData.fArmL.rotation.x = Math.PI * 0.85;
+              f.userData.fArmR.rotation.x = Math.PI * 0.85;
+              f.userData.l1.rotation.x = 0.25;
+              f.userData.l2.rotation.x = -0.25;
+            } else if (distMoved > 0.03) {
+              const swing = Math.sin(now * 0.015) * 0.85;
+              f.userData.l1.rotation.x = swing;
+              f.userData.l2.rotation.x = -swing;
+              f.userData.fArmL.rotation.x = -swing;
+              f.userData.fArmR.rotation.x = swing;
+            } else {
+              f.userData.l1.rotation.x = 0;
+              f.userData.l2.rotation.x = 0;
+              f.userData.fArmL.rotation.x = 0;
+              f.userData.fArmR.rotation.x = 0;
+            }
+
+f.position.set(pData.x, pData.y, pData.z);
+f.rotation.y = pData.ry;
+} else if (friendAvatar) {
+friendAvatar.visible = false;
+}
+}
+const chatRes = await fetch(${DB_URL}/rooms/${currentRoomId}/chat.json);
+const chatData = await chatRes.json();
+if (chatData) {
+const msgs = Object.values(chatData).slice(-20);
+if (msgs.length !== lastChatCount) {
+lastChatCount = msgs.length;
+const box = document.getElementById("chatMessages");
+box.innerHTML = msgs.map(m => <div><b style="color:#38bdf8;">[${m.sender}]:</b> ${m.text.replace(/</g, "&lt;")}</div>).join("");
+box.scrollTop = box.scrollHeight;
+}
+}
+} catch (e) {}
+}, 250);
+window.addEventListener("beforeunload", () => {
+navigator.sendBeacon?.(${DB_URL}/online/${myPlayerId}.json, "");
+});
+animate();
   </script>
 </body>
 </html>
-    
