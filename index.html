@@ -588,23 +588,27 @@ f.rotation.y = pData.ry;
 friendAvatar.visible = false;
 }
 }
-const chatRes = await fetch(${DB_URL}/rooms/${currentRoomId}/chat.json);
-const chatData = await chatRes.json();
-if (chatData) {
-const msgs = Object.values(chatData).slice(-20);
-if (msgs.length !== lastChatCount) {
-lastChatCount = msgs.length;
-const box = document.getElementById("chatMessages");
-box.innerHTML = msgs.map(m => <div><b style="color:#38bdf8;">[${m.sender}]:</b> ${m.text.replace(/</g, "&lt;")}</div>).join("");
-box.scrollTop = box.scrollHeight;
-}
-}
-} catch (e) {}
-}, 250);
-window.addEventListener("beforeunload", () => {
-navigator.sendBeacon?.(${DB_URL}/online/${myPlayerId}.json, "");
-});
-animate();
+        const chatRes = await fetch(DB_URL + "/rooms/" + currentRoomId + "/chat.json");
+        const chatData = await chatRes.json();
+        if (chatData) {
+          const msgs = Object.values(chatData).slice(-20);
+          if (msgs.length !== lastChatCount) {
+            lastChatCount = msgs.length;
+            const box = document.getElementById("chatMessages");
+            box.innerHTML = msgs.map(m => '<div><b style="color:#38bdf8;">[' + m.sender + ']:</b> ' + String(m.text).replace(/</g, "&lt;") + '</div>').join("");
+            box.scrollTop = box.scrollHeight;
+          }
+        }
+      } catch (e) {}
+    }, 250);
+
+    window.addEventListener("beforeunload", () => {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(DB_URL + "/online/" + myPlayerId + ".json", "");
+      }
+    });
+
+    animate();
   </script>
 </body>
 </html>
