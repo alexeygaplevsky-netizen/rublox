@@ -21,6 +21,10 @@
     .btn.active { outline: 2px solid #38bdf8; background: #0284c7; }
     .btn.play { background: #10b981; color: #052e16; }
     .btn.stop { background: #ef4444; color: #fff; }
+    .online-badge {
+      background: #064e3b; border: 1px solid #10b981; color: #6ee7b7;
+      padding: 6px 10px; border-radius: 8px; font-weight: bold; font-size: 13px;
+    }
     .hint {
       position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
       background: rgba(15, 23, 42, 0.85); padding: 6px 14px; border-radius: 10px;
@@ -31,6 +35,7 @@
 <body>
 
   <div class="toolbar">
+    <span id="onlineCounter" class="online-badge">🟢 Онлайн: 1</span>
     <button id="modeBtn" class="btn play" onclick="toggleMode()">▶ Play (Играть)</button>
     <button id="t-block" class="btn active" onclick="selectTool('block')">🟦 Блок</button>
     <button id="t-lava" class="btn" onclick="selectTool('lava')">🟥 Лава</button>
@@ -62,9 +67,12 @@
   <div class="hint" id="hintText">Режим Studio: <b>ЛКМ</b> — поставить блок | <b>ПКМ + мышь</b> — вращать камеру</div>
 
   <script src="three.min.js"></script>
-  <script src="peerjs.min.js"></script>
 
   <script>
+    const DB_URL = "https://firebaseio.com";
+    const myPlayerId = "p_" + Math.random().toString(36).slice(2, 10);
+    let currentRoomId = "lobby";
+
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x38bdf8);
     scene.fog = new THREE.Fog(0x38bdf8, 25, 80);
@@ -329,13 +337,6 @@
       }
     ];
 
-    function getSavedGames() {
-      try {
-        const raw = localStorage.getItem("rublox_games");
-        return raw ? JSON.parse(raw) : [];
-      } catch (e) { return []; }
-    }
-
     function toggleCatalog() {
       const modal = document.getElementById("catalogModal");
       const isOpen = modal.style.display === "flex";
@@ -343,10 +344,18 @@
       if (!isOpen) renderCatalog();
     }
 
-    function renderCatalog() {
+    async function renderCatalog() {
       const list = document.getElementById("gamesList");
+      list.innerHTML = "<div style='color:#94a3b8; text-align:center;'>Загрузка игр из облака...</div>";
+      let cloudGames = [];
+      try {
+        const res = await fetch(`${DB_URL}/games.json`);
+        const data = await res.json();
+        if (data) cloudGames = Object.values(data).reverse();
+      } catch (e) {}
+
       list.innerHTML = "";
-      const allGames = defaultCommunityGames.concat(getSavedGames());
+      const allGames = cloudGames.concat(defaultCommunityGames);
 
       allGames.forEach((g) => {
         const card = document.createElement("div");
@@ -360,7 +369,9 @@
           loadBlocksArray(g.blocks);
           toggleCatalog();
           if (!isPlaying) toggleMode();
-          autoJoinTopGame(g.title);
+          const safeRoom = "top_" + btoa(unescape(encodeURIComponent(g.title))).replace(/[^a-zA-Z0-9]/g, "").slice(0, 18);
+          currentRoomId = safeRoom;
+          document.getElementById("hintText").innerHTML = `🌐 Вы в игре <b>${g.title}</b> — другие игроки здесь видны автоматически!`;
         };
         card.appendChild(playBtn);
         list.appendChild(card);
@@ -374,7 +385,7 @@
       velY = 0;
     }
 
-    function publishCurrentMap() {
+    async function publishCurrentMap() {
       const titleInput = document.getElementById("newGameTitle");
       const title = titleInput.value.trim() || "Без названия";
       if (parts.length === 0) {
@@ -382,11 +393,16 @@
         return;
       }
       const blocksData = parts.map(p => ({ x: p.position.x, y: p.position.y, z: p.position.z, t: p.userData.type }));
-      const saved = getSavedGames();
-      saved.unshift({ title: "⭐ " + title, author: "Ты", blocks: blocksData });
-      localStorage.setItem("rublox_games", JSON.stringify(saved));
-      titleInput.value = "";
-      renderCatalog();
+      try {
+        await fetch(`${DB_URL}/games.json`, {
+          method: "POST",
+          body: JSON.stringify({ title: "⭐ " + title, author: "Игрок", blocks: blocksData })
+        });
+        titleInput.value = "";
+        renderCatalog();
+      } catch (e) {
+        alert("Не удалось сохранить игру в облако!");
+      }
     }
 
     function shareMapCode() {
@@ -411,13 +427,8 @@
       }
     }
 
-    // Настоящий онлайн-мультиплеер через PeerJS
-    let peer = null;
-    let conn = null;
+    // ===== ОБЛАЧНЫЙ МУЛЬТИПЛЕЕР И СЧЁТЧИК ОНЛАЙНА FIREBASE =====
     let friendAvatar = null;
-    const peerConfig = {
-      config: { iceServers: [{ urls: "stun:://google.com" }, { urls: "stun:://google.com" }] }
-    };
 
     function createFriendMesh(name) {
       if (friendAvatar) return friendAvatar;
@@ -450,100 +461,61 @@
       return g;
     }
 
-    function setupConnection(connection) {
-      conn = connection;
-      const friendMesh = createFriendMesh("Друг Онлайн");
-
-      conn.on("data", (data) => {
-        if (data.type === "move") {
-          friendMesh.visible = true;
-          friendMesh.position.set(data.x, data.y, data.z);
-          friendMesh.rotation.y = data.ry;
-        }
-        if (data.type === "map" && typeof loadBlocksArray === "function") {
-          loadBlocksArray(data.blocks);
-        }
-      });
-
-      conn.on("open", () => {
-        friendMesh.visible = true;
-        document.getElementById("hintText").innerHTML = "🎉 <b>Друг подключился к игре!</b> Отойди чуть в сторону, чтобы увидеть его!";
-        if (!isPlaying) toggleMode();
-        const blocksData = parts.map(p => ({ x: p.position.x, y: p.position.y, z: p.position.z, t: p.userData.type }));
-        conn.send({ type: "map", blocks: blocksData });
-      });
-    }
-
-    function hostOnlineRoom() {
-      if (typeof Peer === "undefined") {
-        alert("⚠️ Библиотека PeerJS не загрузилась. Проверь файл peerjs.min.js!");
-        return;
-      }
-      if (peer) { try { peer.destroy(); } catch (e) {} }
+    async function hostOnlineRoom() {
       const roomCode = "rublox-" + Math.floor(1000 + Math.random() * 9000);
-      peer = new Peer(roomCode, peerConfig);
-      peer.on("open", (id) => {
-        navigator.clipboard?.writeText(id);
-        prompt("Комната создана! Скопируй код и отправь другу:", id);
-      });
-      peer.on("connection", (connection) => setupConnection(connection));
+      currentRoomId = roomCode;
+      const blocksData = parts.map(p => ({ x: p.position.x, y: p.position.y, z: p.position.z, t: p.userData.type }));
+      await fetch(`${DB_URL}/rooms/${roomCode}/map.json`, { method: "PUT", body: JSON.stringify(blocksData) });
+      if (!isPlaying) toggleMode();
+      navigator.clipboard?.writeText(roomCode);
+      prompt("Комната создана! Отправь этот код другу:", roomCode);
     }
 
-    function joinOnlineRoom() {
-      if (typeof Peer === "undefined") {
-        alert("⚠️ Библиотека PeerJS не загрузилась. Проверь файл peerjs.min.js!");
-        return;
-      }
+    async function joinOnlineRoom() {
       const roomCode = prompt("Введи код комнаты друга (например, rublox-1234):");
       if (!roomCode) return;
-      if (peer) { try { peer.destroy(); } catch (e) {} }
-      peer = new Peer(peerConfig);
-      peer.on("open", () => {
-        const connection = peer.connect(roomCode.trim());
-        setupConnection(connection);
-      });
+      currentRoomId = roomCode.trim();
+      try {
+        const res = await fetch(`${DB_URL}/rooms/${currentRoomId}/map.json`);
+        const mapData = await res.json();
+        if (mapData) loadBlocksArray(mapData);
+        if (!isPlaying) toggleMode();
+      } catch (e) {}
     }
 
-    setInterval(() => {
-      if (conn && conn.open && isPlaying) {
-        conn.send({
-          type: "move",
-          x: avatar.position.x,
-          y: avatar.position.y,
-          z: avatar.position.z,
-          ry: avatar.rotation.y
+    // Обмен координатами и живой подсчёт онлайна (каждые 250 мс)
+    setInterval(async () => {
+      const now = Date.now();
+      try {
+        await fetch(`${DB_URL}/online/${myPlayerId}.json`, {
+          method: "PUT",
+          body: JSON.stringify({ room: currentRoomId, x: avatar.position.x, y: avatar.position.y, z: avatar.position.z, ry: avatar.rotation.y, playing: isPlaying, ts: now })
         });
-      }
-    }, 33);
+        const res = await fetch(`${DB_URL}/online.json`);
+        const all = await res.json();
+        if (all) {
+          const active = Object.entries(all).filter(([id, p]) => p && (now - p.ts < 8000));
+          document.getElementById("onlineCounter").textContent = `🟢 Онлайн: ${active.length}`;
 
-    // Автоматическая встреча двух игроков в любой карте из топа
-    function autoJoinTopGame(gameTitle) {
-      if (typeof Peer === "undefined") return;
-      if (peer) { try { peer.destroy(); } catch (e) {} }
-
-      const safeId = btoa(unescape(encodeURIComponent(String(gameTitle)))).replace(/[^a-zA-Z0-9]/g, "").slice(0, 20);
-      const cleanRoomId = "rublox-top-" + safeId + "-1";
-
-      peer = new Peer(cleanRoomId, peerConfig);
-
-      peer.on("open", () => {
-        document.getElementById("hintText").innerHTML = "📡 Ты первый в игре <b>" + gameTitle + "</b> — ждём второго игрока...";
-      });
-
-      peer.on("connection", (connection) => setupConnection(connection));
-
-      peer.on("error", (err) => {
-        if (err.type === "unavailable-id") {
-          peer = new Peer(peerConfig);
-          peer.on("open", () => {
-            const connection = peer.connect(cleanRoomId);
-            setupConnection(connection);
-          });
+          const other = active.find(([id, p]) => id !== myPlayerId && p.room === currentRoomId);
+          if (other) {
+            const f = createFriendMesh("Друг Онлайн");
+            f.visible = true;
+            f.position.set(other[1].x, other[1].y, other[1].z);
+            f.rotation.y = other[1].ry;
+          } else if (friendAvatar) {
+            friendAvatar.visible = false;
+          }
         }
-      });
-    }
+      } catch (e) {}
+    }, 250);
+
+    window.addEventListener("beforeunload", () => {
+      navigator.sendBeacon?.(`${DB_URL}/online/${myPlayerId}.json`, "");
+    });
 
     animate();
   </script>
 </body>
 </html>
+    
