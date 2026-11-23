@@ -336,7 +336,7 @@
 
       renderer.render(scene, camera);
     }
-    const defaultCommunityGames = [
+        const defaultCommunityGames = [
       {
         title: "🔥 Лавовый Прыжок",
         author: "Sasha_Pro",
@@ -376,7 +376,7 @@
       list.innerHTML = "<div style='color:#94a3b8; text-align:center;'>Загрузка игр из облака...</div>";
       let cloudGames = [];
       try {
-        const res = await fetch(`${DB_URL}/games.json`);
+        const res = await fetch(DB_URL + "/games.json");
         const data = await res.json();
         if (data) cloudGames = Object.values(data).reverse();
       } catch (e) {}
@@ -387,7 +387,7 @@
       allGames.forEach((g) => {
         const card = document.createElement("div");
         card.style.cssText = "background:#0f172a; border:1px solid #334155; padding:10px 14px; border-radius:10px; display:flex; justify-content:space-between; align-items:center;";
-        card.innerHTML = `<div><b style="color:#f8fafc;">${g.title}</b><br><span style="font-size:12px; color:#94a3b8;">Автор: ${g.author} • Блоков: ${g.blocks.length}</span></div>`;
+        card.innerHTML = '<div><b style="color:#f8fafc;">' + g.title + '</b><br><span style="font-size:12px; color:#94a3b8;">Автор: ' + g.author + ' • Блоков: ' + g.blocks.length + '</span></div>';
 
         const playBtn = document.createElement("button");
         playBtn.className = "btn play";
@@ -399,7 +399,7 @@
           const safeRoom = "top_" + btoa(unescape(encodeURIComponent(g.title))).replace(/[^a-zA-Z0-9]/g, "").slice(0, 18);
           currentRoomId = safeRoom;
           lastChatCount = 0;
-          document.getElementById("hintText").innerHTML = `🌐 Вы в игре <b>${g.title}</b> — другие игроки и чат работают автоматически!`;
+          document.getElementById("hintText").innerHTML = '🌐 Вы в игре <b>' + g.title + '</b> — другие игроки и чат работают автоматически!';
         };
         card.appendChild(playBtn);
         list.appendChild(card);
@@ -422,7 +422,7 @@
       }
       const blocksData = parts.map(p => ({ x: p.position.x, y: p.position.y, z: p.position.z, t: p.userData.type }));
       try {
-        await fetch(`${DB_URL}/games.json`, {
+        await fetch(DB_URL + "/games.json", {
           method: "POST",
           body: JSON.stringify({ title: "⭐ " + title, author: "Игрок", blocks: blocksData })
         });
@@ -435,7 +435,7 @@
 
     function shareMapCode() {
       if (parts.length === 0) { alert("Карта пустая!"); return; }
-      const compact = parts.map(p => `${p.position.x},${p.position.y},${p.position.z},${p.userData.type}`).join(";");
+      const compact = parts.map(p => p.position.x + "," + p.position.y + "," + p.position.z + "," + p.userData.type).join(";");
       navigator.clipboard?.writeText(compact);
       prompt("Скопируй этот код карты и отправь другу в чат:", compact);
     }
@@ -454,8 +454,6 @@
         alert("⚠️ Неверный формат кода карты.");
       }
     }
-
-    // ===== ОБЛАЧНЫЙ МУЛЬТИПЛЕЕР, АНИМАЦИЯ И ЧАТ FIREBASE =====
     let friendAvatar = null;
     let lastChatCount = 0;
 
@@ -508,7 +506,7 @@
       currentRoomId = roomCode;
       lastChatCount = 0;
       const blocksData = parts.map(p => ({ x: p.position.x, y: p.position.y, z: p.position.z, t: p.userData.type }));
-      await fetch(`${DB_URL}/rooms/${roomCode}/map.json`, { method: "PUT", body: JSON.stringify(blocksData) });
+      await fetch(DB_URL + "/rooms/" + roomCode + "/map.json", { method: "PUT", body: JSON.stringify(blocksData) });
       if (!isPlaying) toggleMode();
       navigator.clipboard?.writeText(roomCode);
       prompt("Комната создана! Отправь этот код другу:", roomCode);
@@ -520,7 +518,7 @@
       currentRoomId = roomCode.trim();
       lastChatCount = 0;
       try {
-        const res = await fetch(`${DB_URL}/rooms/${currentRoomId}/map.json`);
+        const res = await fetch(DB_URL + "/rooms/" + currentRoomId + "/map.json");
         const mapData = await res.json();
         if (mapData) loadBlocksArray(mapData);
         if (!isPlaying) toggleMode();
@@ -533,7 +531,7 @@
       if (!text) return;
       input.value = "";
       try {
-        await fetch(`${DB_URL}/rooms/${currentRoomId}/chat.json`, {
+        await fetch(DB_URL + "/rooms/" + currentRoomId + "/chat.json", {
           method: "POST",
           body: JSON.stringify({ sender: myPlayerId.slice(2, 6).toUpperCase(), text: text, ts: Date.now() })
         });
@@ -543,16 +541,16 @@
     setInterval(async () => {
       const now = Date.now();
       try {
-        await fetch(`${DB_URL}/online/${myPlayerId}.json`, {
+        await fetch(DB_URL + "/online/" + myPlayerId + ".json", {
           method: "PUT",
           body: JSON.stringify({ room: currentRoomId, x: avatar.position.x, y: avatar.position.y, z: avatar.position.z, ry: avatar.rotation.y, playing: isPlaying, ts: now })
         });
 
-        const res = await fetch(`${DB_URL}/online.json`);
+        const res = await fetch(DB_URL + "/online.json");
         const all = await res.json();
         if (all) {
           const active = Object.entries(all).filter(([id, p]) => p && (now - p.ts < 8000));
-          document.getElementById("onlineCounter").textContent = `🟢 Онлайн: ${active.length}`;
+          document.getElementById("onlineCounter").textContent = "🟢 Онлайн: " + active.length;
 
           const otherEntry = active.find(([id, p]) => id !== myPlayerId && p.room === currentRoomId);
           if (otherEntry) {
@@ -582,12 +580,13 @@
               f.userData.fArmR.rotation.x = 0;
             }
 
-f.position.set(pData.x, pData.y, pData.z);
-f.rotation.y = pData.ry;
-} else if (friendAvatar) {
-friendAvatar.visible = false;
-}
-}
+            f.position.set(pData.x, pData.y, pData.z);
+            f.rotation.y = pData.ry;
+          } else if (friendAvatar) {
+            friendAvatar.visible = false;
+          }
+        }
+
         const chatRes = await fetch(DB_URL + "/rooms/" + currentRoomId + "/chat.json");
         const chatData = await chatRes.json();
         if (chatData) {
@@ -612,3 +611,4 @@ friendAvatar.visible = false;
   </script>
 </body>
 </html>
+
