@@ -62,14 +62,13 @@
     <button class="btn" style="background:#0284c7;" onclick="shareMapCode()">📤 Код карты</button>
     <button class="btn" style="background:#0284c7;" onclick="importMapCode()">📥 Вставить код</button>
     <button class="btn" onclick="clearMap()">🧹 Очистить</button>
-        <div style="display:flex; align-items:center; gap:6px; background:#1e293b; padding:4px 8px; border-radius:8px; border:1px solid #475569;">
+    <div style="display:flex; align-items:center; gap:6px; background:#1e293b; padding:4px 8px; border-radius:8px; border:1px solid #475569;">
       <span style="font-size:12px; color:#cbd5e1;">👕</span>
       <input type="color" id="shirtColor" value="#0284c7" onchange="updateSkinColor()" style="width:24px; height:24px; border:none; background:none; cursor:pointer;">
       <span style="font-size:12px; color:#cbd5e1;">👖</span>
       <input type="color" id="pantsColor" value="#16a34a" onchange="updateSkinColor()" style="width:24px; height:24px; border:none; background:none; cursor:pointer;">
     </div>
-
-
+  </div>
 
   <div id="catalogModal" style="display:none; position:fixed; inset:0; background:rgba(9,13,22,0.85); z-index:20; align-items:center; justify-content:center;">
     <div style="background:#1e293b; border:1px solid #475569; border-radius:16px; padding:20px; width:90%; max-width:460px; box-shadow:0 20px 50px rgba(0,0,0,0.7);">
@@ -98,7 +97,6 @@
   <div class="hint" id="hintText">Режим Studio: <b>ЛКМ</b> — поставить блок | <b>ПКМ + мышь</b> — вращать камеру</div>
 
   <script src="three.min.js"></script>
-
   <script>
     const DB_URL = "https://" + "bloxag-default-rtdb." + "firebaseio.com";
     const myPlayerId = "p_" + Math.random().toString(36).slice(2, 10);
@@ -106,7 +104,7 @@
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x38bdf8);
-    scene.fog = new THREE.Fog(0x38bdf8, 25, 80);
+    scene.fog = new THREE.Fog(0x38bdf8, 25, 85);
 
     const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 150);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -150,6 +148,7 @@
     avatar.add(torso, head, legL, legR, armL, armR);
     avatar.visible = false;
     scene.add(avatar);
+
     let parts = [];
     let currentTool = "block";
     let isPlaying = false;
@@ -158,21 +157,7 @@
     let velY = 0, onGround = false;
     let keys = {};
 
-    function getPartColor(type) {
-      if (type === "lava") return 0xef4444;
-      if (type === "jump") return 0x22c55e;
-      if (type === "win") return 0xfacc15;
-      return 0x3b82f6;
-    }
-
-    function selectTool(tool) {
-      currentTool = tool;
-      document.querySelectorAll(".toolbar .btn").forEach(b => b.classList.remove("active"));
-      const btn = document.getElementById("t-" + tool);
-      if (btn) btn.classList.add("active");
-    }
-
-       function updateSkinColor() {
+    function updateSkinColor() {
       const sCol = document.getElementById("shirtColor").value;
       const pCol = document.getElementById("pantsColor").value;
       torso.material.color.set(sCol);
@@ -196,14 +181,26 @@
     }
     spawnClouds();
 
+    function getPartColor(type) {
+      if (type === "lava") return 0xef4444;
+      if (type === "jump") return 0x22c55e;
+      if (type === "win") return 0xfacc15;
+      return 0x3b82f6;
+    }
+
+    function selectTool(tool) {
+      currentTool = tool;
+      document.querySelectorAll(".toolbar .btn").forEach(b => b.classList.remove("active"));
+      const btn = document.getElementById("t-" + tool);
+      if (btn) btn.classList.add("active");
+    }
+
     function addPart(x, y, z, type) {
       const geo = new THREE.BoxGeometry(2, 1, 2);
       const mesh = new THREE.Mesh(
         geo,
         new THREE.MeshStandardMaterial({ color: getPartColor(type), roughness: 0.3, metalness: 0.1 })
       );
-      
-      // Добавляем красивую светящуюся окантовку граней
       const edges = new THREE.EdgesGeometry(geo);
       let edgeColor = 0x93c5fd;
       if (type === "lava") edgeColor = 0xfca5a5;
@@ -221,11 +218,11 @@
     addPart(0, 0.5, -4, "block");
     addPart(0, 1.5, -8, "jump");
     addPart(0, 3.5, -14, "win");
-{
+
+    function clearMap() {
       parts.forEach(p => scene.remove(p));
       parts = [];
     }
-
     function toggleMode() {
       isPlaying = !isPlaying;
       const btn = document.getElementById("modeBtn");
@@ -258,7 +255,7 @@
         raycaster.setFromCamera(mouse, camera);
         const hits = raycaster.intersectObjects([baseplate].concat(parts));
         if (hits.length > 0) {
-          const hit = hits[0];
+          const hit = hits;
           if (currentTool === "del") {
             if (!hit.object.userData.isBase) {
               scene.remove(hit.object);
@@ -377,7 +374,8 @@
 
       renderer.render(scene, camera);
     }
-        const defaultCommunityGames = [
+
+    const defaultCommunityGames = [
       {
         title: "🔥 Лавовый Прыжок",
         author: "Sasha_Pro",
@@ -404,7 +402,6 @@
         ]
       }
     ];
-
     function toggleCatalog() {
       const modal = document.getElementById("catalogModal");
       const isOpen = modal.style.display === "flex";
@@ -486,8 +483,8 @@
       if (!code) return;
       try {
         const parsed = code.split(";").map(item => {
-          const d = item.split(",");
-          return { x: Number(d[0]), y: Number(d[1]), z: Number(d[2]), t: d[3] || "block" };
+          const [x, y, z, t] = item.split(",");
+          return { x: Number(x), y: Number(y), z: Number(z), t: t || "block" };
         });
         loadBlocksArray(parsed);
         alert("✅ Карта друга загружена! Нажми Play, чтобы пройти её.");
@@ -536,7 +533,7 @@
       sprite.position.y = 3.35;
 
       g.add(t, h, l1, l2, fArmL, fArmR, sprite);
-      g.userData = { l1, l2, fArmL, fArmR, lastX: 0, lastZ: 0 };
+      g.userData = { t, l1, l2, fArmL, fArmR, lastX: 0, lastZ: 0 };
       scene.add(g);
       friendAvatar = g;
       return g;
@@ -582,16 +579,22 @@
     setInterval(async () => {
       const now = Date.now();
       try {
+        const payload = {
+          room: currentRoomId,
+          x: avatar.position.x,
+          y: avatar.position.y,
+          z: avatar.position.z,
+          ry: avatar.rotation.y,
+          playing: isPlaying,
+          ts: now,
+          sCol: document.getElementById("shirtColor").value,
+          pCol: document.getElementById("pantsColor").value
+        };
+
         await fetch(DB_URL + "/online/" + myPlayerId + ".json", {
           method: "PUT",
-                body: JSON.stringify({ 
-         room: currentRoomId, 
-         x: avatar.position.x, y: avatar.position.y, z: avatar.position.z, 
-         ry: avatar.rotation.y, playing: isPlaying, ts: now,
-         sCol: document.getElementById("shirtColor").value,
-         pCol: document.getElementById("pantsColor").value
-       })
-
+          body: JSON.stringify(payload)
+        });
 
         const res = await fetch(DB_URL + "/online.json");
         const all = await res.json();
@@ -601,15 +604,15 @@
 
           const otherEntry = active.find(([id, p]) => id !== myPlayerId && p.room === currentRoomId);
           if (otherEntry) {
-            const pData = otherEntry[1];
+            const [, pData] = otherEntry;
             const f = createFriendMesh("Друг Онлайн");
-                     if (pData.sCol) f.children[0].material.color.set(pData.sCol);
-         if (pData.pCol) {
-           f.userData.l1.material.color.set(pData.pCol);
-           f.userData.l2.material.color.set(pData.pCol);
-         }
-
             f.visible = true;
+
+            if (pData.sCol) f.userData.t.material.color.set(pData.sCol);
+            if (pData.pCol) {
+              f.userData.l1.material.color.set(pData.pCol);
+              f.userData.l2.material.color.set(pData.pCol);
+            }
 
             const distMoved = Math.hypot(pData.x - f.userData.lastX, pData.z - f.userData.lastZ);
             f.userData.lastX = pData.x;
@@ -664,4 +667,3 @@
   </script>
 </body>
 </html>
-
