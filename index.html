@@ -255,7 +255,7 @@
         raycaster.setFromCamera(mouse, camera);
         const hits = raycaster.intersectObjects([baseplate].concat(parts));
         if (hits.length > 0) {
-          const hit = hits;
+          const [hit] = hits;
           if (currentTool === "del") {
             if (!hit.object.userData.isBase) {
               scene.remove(hit.object);
