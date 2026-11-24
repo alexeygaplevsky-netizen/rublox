@@ -62,7 +62,14 @@
     <button class="btn" style="background:#0284c7;" onclick="shareMapCode()">📤 Код карты</button>
     <button class="btn" style="background:#0284c7;" onclick="importMapCode()">📥 Вставить код</button>
     <button class="btn" onclick="clearMap()">🧹 Очистить</button>
-  </div>
+        <div style="display:flex; align-items:center; gap:6px; background:#1e293b; padding:4px 8px; border-radius:8px; border:1px solid #475569;">
+      <span style="font-size:12px; color:#cbd5e1;">👕</span>
+      <input type="color" id="shirtColor" value="#0284c7" onchange="updateSkinColor()" style="width:24px; height:24px; border:none; background:none; cursor:pointer;">
+      <span style="font-size:12px; color:#cbd5e1;">👖</span>
+      <input type="color" id="pantsColor" value="#16a34a" onchange="updateSkinColor()" style="width:24px; height:24px; border:none; background:none; cursor:pointer;">
+    </div>
+
+
 
   <div id="catalogModal" style="display:none; position:fixed; inset:0; background:rgba(9,13,22,0.85); z-index:20; align-items:center; justify-content:center;">
     <div style="background:#1e293b; border:1px solid #475569; border-radius:16px; padding:20px; width:90%; max-width:460px; box-shadow:0 20px 50px rgba(0,0,0,0.7);">
@@ -165,11 +172,46 @@
       if (btn) btn.classList.add("active");
     }
 
+       function updateSkinColor() {
+      const sCol = document.getElementById("shirtColor").value;
+      const pCol = document.getElementById("pantsColor").value;
+      torso.material.color.set(sCol);
+      legL.material.color.set(pCol);
+      legR.material.color.set(pCol);
+    }
+
+    function spawnClouds() {
+      const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+      for (let i = 0; i < 14; i++) {
+        const cloud = new THREE.Group();
+        const puffs = 2 + Math.floor(Math.random() * 3);
+        for (let j = 0; j < puffs; j++) {
+          const box = new THREE.Mesh(new THREE.BoxGeometry(3 + Math.random() * 3, 1.2, 2 + Math.random() * 2), cloudMat);
+          box.position.set(j * 2.2, Math.random() * 0.5, (Math.random() - 0.5) * 2);
+          cloud.add(box);
+        }
+        cloud.position.set((Math.random() - 0.5) * 70, 14 + Math.random() * 8, (Math.random() - 0.5) * 70);
+        scene.add(cloud);
+      }
+    }
+    spawnClouds();
+
     function addPart(x, y, z, type) {
+      const geo = new THREE.BoxGeometry(2, 1, 2);
       const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(2, 1, 2),
-        new THREE.MeshStandardMaterial({ color: getPartColor(type) })
+        geo,
+        new THREE.MeshStandardMaterial({ color: getPartColor(type), roughness: 0.3, metalness: 0.1 })
       );
+      
+      // Добавляем красивую светящуюся окантовку граней
+      const edges = new THREE.EdgesGeometry(geo);
+      let edgeColor = 0x93c5fd;
+      if (type === "lava") edgeColor = 0xfca5a5;
+      if (type === "jump") edgeColor = 0x86efac;
+      if (type === "win") edgeColor = 0xfef08a;
+      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: edgeColor }));
+      mesh.add(line);
+
       mesh.position.set(x, y, z);
       mesh.userData = { type: type };
       scene.add(mesh);
@@ -179,8 +221,7 @@
     addPart(0, 0.5, -4, "block");
     addPart(0, 1.5, -8, "jump");
     addPart(0, 3.5, -14, "win");
-
-    function clearMap() {
+{
       parts.forEach(p => scene.remove(p));
       parts = [];
     }
@@ -543,8 +584,14 @@
       try {
         await fetch(DB_URL + "/online/" + myPlayerId + ".json", {
           method: "PUT",
-          body: JSON.stringify({ room: currentRoomId, x: avatar.position.x, y: avatar.position.y, z: avatar.position.z, ry: avatar.rotation.y, playing: isPlaying, ts: now })
-        });
+                body: JSON.stringify({ 
+         room: currentRoomId, 
+         x: avatar.position.x, y: avatar.position.y, z: avatar.position.z, 
+         ry: avatar.rotation.y, playing: isPlaying, ts: now,
+         sCol: document.getElementById("shirtColor").value,
+         pCol: document.getElementById("pantsColor").value
+       })
+
 
         const res = await fetch(DB_URL + "/online.json");
         const all = await res.json();
@@ -556,6 +603,12 @@
           if (otherEntry) {
             const pData = otherEntry[1];
             const f = createFriendMesh("Друг Онлайн");
+                     if (pData.sCol) f.children[0].material.color.set(pData.sCol);
+         if (pData.pCol) {
+           f.userData.l1.material.color.set(pData.pCol);
+           f.userData.l2.material.color.set(pData.pCol);
+         }
+
             f.visible = true;
 
             const distMoved = Math.hypot(pData.x - f.userData.lastX, pData.z - f.userData.lastZ);
