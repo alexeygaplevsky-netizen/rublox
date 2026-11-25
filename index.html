@@ -6,18 +6,29 @@
   <title>MiniBlox Studio — Rublox</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-    body { overflow: hidden; background: #0f172a; color: #f8fafc; user-select: none; }
-    .toolbar {
-      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.92); border: 1px solid #334155;
-      padding: 8px 12px; border-radius: 14px; display: flex; gap: 6px; align-items: center;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 10; flex-wrap: wrap; max-width: 96vw;
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0f172a; color: #f8fafc; user-select: none; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    /* Принудительный поворот, если встроенный браузер мессенджера не крутит экран */
+    body.force-landscape {
+      position: fixed;
+      top: 0; left: 100vw;
+      width: 100vh; height: 100vw;
+      transform: rotate(90deg);
+      transform-origin: top left;
     }
-    .toolbar-items { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+    .toolbar {
+      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.92); border: 1px solid #334155;
+      padding: 6px 10px; border-radius: 12px; display: flex; gap: 5px; align-items: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 10; flex-wrap: wrap; max-width: 96%;
+    }
+    .toolbar-items { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
     .toolbar.collapsed .toolbar-items { display: none; }
     #toggleMenuBtn { display: none; background: #0284c7; }
     .btn {
-      background: #334155; color: #fff; border: none; padding: 7px 10px;
+      background: #334155; color: #fff; border: none; padding: 6px 9px;
       border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 12px;
     }
     .btn:hover { background: #475569; }
@@ -26,55 +37,54 @@
     .btn.stop { background: #ef4444; color: #fff; }
     .online-badge {
       background: #064e3b; border: 1px solid #10b981; color: #6ee7b7;
-      padding: 6px 10px; border-radius: 8px; font-weight: bold; font-size: 12px;
+      padding: 5px 8px; border-radius: 8px; font-weight: bold; font-size: 12px;
     }
     .skin-picker {
       display: flex; align-items: center; gap: 4px; background: #1e293b;
-      padding: 3px 8px; border-radius: 8px; border: 1px solid #475569; font-size: 12px;
+      padding: 2px 6px; border-radius: 8px; border: 1px solid #475569; font-size: 12px;
     }
-    .skin-picker input { width: 22px; height: 22px; border: none; background: none; cursor: pointer; }
+    .skin-picker input { width: 20px; height: 20px; border: none; background: none; cursor: pointer; }
     .chat-box {
-      position: absolute; bottom: 52px; left: 14px; width: 280px;
+      position: absolute; bottom: 50px; left: 12px; width: 260px;
       background: rgba(15, 23, 42, 0.85); border: 1px solid #334155;
-      border-radius: 12px; padding: 8px; z-index: 15; display: flex; flex-direction: column; gap: 6px;
+      border-radius: 12px; padding: 8px; z-index: 15; display: flex; flex-direction: column; gap: 5px;
     }
-    .chat-messages { height: 110px; overflow-y: auto; font-size: 12px; color: #e2e8f0; display: flex; flex-direction: column; gap: 4px; word-break: break-word; }
-    .chat-input-row { display: flex; gap: 6px; }
+    .chat-messages { height: 100px; overflow-y: auto; font-size: 12px; color: #e2e8f0; display: flex; flex-direction: column; gap: 4px; word-break: break-word; }
+    .chat-input-row { display: flex; gap: 5px; }
     .chat-input-row input { flex: 1; background: #0f172a; border: 1px solid #475569; color: #fff; padding: 5px 8px; border-radius: 6px; font-size: 12px; }
     .hint {
-      position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.85); padding: 6px 14px; border-radius: 10px;
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.85); padding: 5px 12px; border-radius: 10px;
       font-size: 12px; color: #cbd5e1; pointer-events: none; z-index: 10;
     }
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(9,13,22,0.85); z-index: 30; align-items: center; justify-content: center; }
-    .modal-card { background: #1e293b; border: 1px solid #475569; border-radius: 16px; padding: 18px; width: 90%; max-width: 460px; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; color: #38bdf8; }
-    .games-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
-    .modal-footer { margin-top: 12px; border-top: 1px solid #334155; padding-top: 10px; display: flex; gap: 8px; }
-    .modal-footer input { flex: 1; padding: 7px 10px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #fff; }
+    .modal-card { background: #1e293b; border: 1px solid #475569; border-radius: 16px; padding: 16px; width: 90%; max-width: 440px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: #38bdf8; }
+    .games-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
+    .modal-footer { margin-top: 10px; border-top: 1px solid #334155; padding-top: 10px; display: flex; gap: 6px; }
+    .modal-footer input { flex: 1; padding: 6px 10px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #fff; }
     #rotate-warning, #mobile-controls { display: none; }
 
     @media (max-width: 850px) and (orientation: portrait) {
-      #rotate-warning {
-        display: flex; position: fixed; inset: 0; z-index: 9999; background: rgba(15, 23, 42, 0.95);
+      body:not(.force-landscape) #rotate-warning {
+        display: flex; position: fixed; inset: 0; z-index: 9999; background: rgba(15, 23, 42, 0.96);
         align-items: center; justify-content: center; text-align: center; padding: 20px;
       }
-      .rotate-box button { margin-top: 12px; }
     }
-    @media (max-height: 520px) and (orientation: landscape), (pointer: coarse) {
+    @media (max-height: 540px) and (orientation: landscape), (pointer: coarse) {
       #toggleMenuBtn { display: inline-block; }
       .hint { display: none; }
-      .toolbar { left: 8px; top: 8px; transform: none; max-width: 60vw; max-height: 58vh; overflow-y: auto; padding: 5px; }
+      .toolbar { left: 8px; top: 8px; transform: none; max-width: 60%; max-height: 55%; overflow-y: auto; padding: 5px; }
       .toolbar button { padding: 4px 6px; font-size: 11px; }
-      .chat-box { top: 8px; right: 8px; left: auto; bottom: auto; width: 200px; padding: 5px; opacity: 0.85; }
-      .chat-messages { height: 60px; font-size: 11px; }
+      .chat-box { top: 8px; right: 8px; left: auto; bottom: auto; width: 190px; padding: 5px; opacity: 0.85; }
+      .chat-messages { height: 55px; font-size: 11px; }
       #mobile-controls {
         display: flex; justify-content: space-between; align-items: flex-end;
-        position: fixed; bottom: 12px; left: 16px; right: 16px; pointer-events: none; z-index: 25;
+        position: absolute; bottom: 12px; left: 16px; right: 16px; pointer-events: none; z-index: 25;
       }
       #mobile-controls button {
         pointer-events: auto; width: 44px; height: 44px; font-size: 18px;
-        background: rgba(15, 23, 42, 0.6); color: #fff; border: 1px solid rgba(255,255,255,0.35);
+        background: rgba(15, 23, 42, 0.65); color: #fff; border: 1px solid rgba(255,255,255,0.35);
         border-radius: 12px; touch-action: manipulation;
       }
       .dpad { display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -85,13 +95,14 @@
 </head>
 <body>
 
-  <!-- 1. ИНТЕРФЕЙС И КНОПКИ -->
   <div id="rotate-warning">
     <div class="rotate-box">
       <div style="font-size:44px;">📱🔄</div>
       <h3>Поверни телефон горизонтально</h3>
-      <p>Так экран станет широким, а кнопки удобно лягут под пальцы!</p>
-      <button class="btn" onclick="document.getElementById('rotate-warning').style.display='none'">Играть так</button>
+      <p style="margin:8px 0 14px; color:#cbd5e1;">Включи автоповорот на телефоне или нажми кнопку ниже:</p>
+      <button class="btn play" style="font-size:15px; padding:10px 16px;" onclick="enableLandscape()">🔄 Повернуть экран на 90°</button>
+      <br><br>
+      <button class="btn" onclick="document.getElementById('rotate-warning').style.display='none'">Играть вертикально</button>
     </div>
   </div>
 
@@ -159,40 +170,60 @@
     <button id="btn-jump">⬆</button>
   </div>
 
-  <script src="three.min.js"></script>
+  <!-- Грузим Three.js с CDN с резервным переходом на локальный three.min.js -->
+  <script src="https://cloudflare.com"></script>
   <script>
-    // ================= 2. 3D-СЦЕНА, ОБЛАКА И КАМЕРА =================
-    const DB_URL = "https://" + "bloxag-default-rtdb." + "firebaseio.com";
-    const myPlayerId = "p_" + Math.random().toString(36).slice(2, 10);
-    let currentRoomId = "lobby";
-    let isPlayMode = false;
+    if (typeof THREE === "undefined") {
+      document.write('<script src="three.min.js"><\/script>');
+    }
+  </script>
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x38bdf8);
-    scene.fog = new THREE.Fog(0x38bdf8, 25, 85);
-
-    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 150);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const sun = new THREE.DirectionalLight(0xffffff, 1.3);
-    sun.position.set(15, 25, 15);
-    scene.add(sun);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-
-    const baseplate = new THREE.Mesh(
-      new THREE.BoxGeometry(40, 1, 40),
-      new THREE.MeshStandardMaterial({ color: 0x475569 })
-    );
-    baseplate.position.y = -0.5;
-    baseplate.userData.isBase = true;
-    scene.add(baseplate);
-    scene.add(new THREE.GridHelper(40, 40, 0x94a3b8, 0x334155));
-
-    for (let i = 0; i < 12; i++) {
-      const cloud = new THREE.Mesh(
-Используйте код с осторожностью.
+  <script>
+    function enableLandscape() {
+      document.body.classList.add("force-landscape");
+      document.getElementById("rotate-warning").style.display = "none";
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock("landscape").catch(() => {});
+      }
+      setTimeout(onWindowResize, 150);
+    }
+const DB_URL = "https://" + "bloxag-default-rtdb." + "firebaseio.com";
+const myPlayerId = "p_" + Math.random().toString(36).slice(2, 10);
+let currentRoomId = "lobby";
+let isPlayMode = false;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x38bdf8);
+scene.fog = new THREE.Fog(0x38bdf8, 25, 85);
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 150);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+function onWindowResize() {
+const isForced = document.body.classList.contains("force-landscape");
+const w = isForced ? window.innerHeight : window.innerWidth;
+const h = isForced ? window.innerWidth : window.innerHeight;
+camera.aspect = w / h;
+camera.updateProjectionMatrix();
+renderer.setSize(w, h);
+}
+window.addEventListener("resize", onWindowResize);
+const sun = new THREE.DirectionalLight(0xffffff, 1.3);
+sun.position.set(15, 25, 15);
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+const baseplate = new THREE.Mesh(
+new THREE.BoxGeometry(40, 1, 40),
+new THREE.MeshStandardMaterial({ color: 0x475569 })
+);
+baseplate.position.y = -0.5;
+baseplate.userData.isBase = true;
+scene.add(baseplate);
+scene.add(new THREE.GridHelper(40, 40, 0x94a3b8, 0x334155));
+for (let i = 0; i < 12; i++) {
+const cloud = new THREE.Mesh(
 new THREE.BoxGeometry(4 + Math.random() * 4, 1, 3 + Math.random() * 3),
 new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
 );
@@ -221,12 +252,6 @@ camPitch = Math.max(0.1, Math.min(1.3, camPitch + (e.touches[0].clientY - prevY)
 prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
 }, { passive: true });
 renderer.domElement.addEventListener("touchend", () => isRotating = false);
-window.addEventListener("resize", () => {
-camera.aspect = window.innerWidth / window.innerHeight;
-camera.updateProjectionMatrix();
-renderer.setSize(window.innerWidth, window.innerHeight);
-});
-// ================= 3. ПЕРСОНАЖ, СКИНЫ И КНОПКИ ТЕЛЕФОНА =================
 function createAvatar(shirtHex = "#0284c7", pantsHex = "#16a34a") {
 const group = new THREE.Group();
 const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
@@ -290,7 +315,6 @@ btn.className = "btn play";
 hint.innerHTML = "Режим Studio: ЛКМ — поставить блок | ПКМ + мышь — вращать камеру";
 }
 }
-// ================= 4. СТРОИТЕЛЬ КАРТ И НЕОНОВЫЕ БЛОКИ =================
 let currentTool = "block";
 const blocks = [];
 const BLOCK_COLORS = { block: 0x0284c7, lava: 0xef4444, jump: 0x22c55e, win: 0xfacc15 };
@@ -322,8 +346,9 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 renderer.domElement.addEventListener("pointerdown", e => {
 if (isPlayMode || e.button !== 0) return;
-mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+const rect = renderer.domElement.getBoundingClientRect();
+mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 raycaster.setFromCamera(mouse, camera);
 const hits = raycaster.intersectObjects([baseplate, ...blocks]);
 if (!hits.length) return;
@@ -387,7 +412,6 @@ row.appendChild(playBtn);
 list.appendChild(row);
 });
 }
-// ================= 5. МУЛЬТИПЛЕЕР, ЧАТ И ЦИКЛ 60 FPS =================
 function hostOnlineRoom() {
 currentRoomId = "room_" + Math.floor(1000 + Math.random() * 9000);
 alert("Комната создана! Код для друга: " + currentRoomId);
