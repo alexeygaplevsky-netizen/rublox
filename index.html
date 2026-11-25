@@ -6,7 +6,7 @@
   <title>MiniBlox Studio — Rublox</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #38bdf8; color: #f8fafc; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0f172a; color: #f8fafc; user-select: none; }
     canvas { position: fixed; inset: 0; width: 100% !important; height: 100% !important; z-index: 1; display: block; }
 
     body.force-landscape {
@@ -172,10 +172,13 @@
     <button id="btn-jump">⬆</button>
   </div>
 
-  <!-- Загружаем локальный three.min.js из твоего репозитория -->
-  <script src="three.min.js"></script>
+  <script src="https://cloudflare.com"></script>
   <script>
-    // На телефоне сворачиваем длинное меню по умолчанию, чтобы не мешало кнопкам
+    if (typeof THREE === "undefined") {
+      document.write('<script src="three.min.js"><\/script>');
+    }
+  </script>
+  <script>
     if (window.innerWidth <= 900 || 'ontouchstart' in window) {
       document.getElementById("toolbar").classList.add("collapsed");
     }
@@ -193,7 +196,8 @@
     }
 
     const DB_URL = "https://" + "bloxag-default-rtdb." + "firebaseio.com";
-    const myPlayerId = "p_" + Math.random().toString(36).slice(2, 10);
+Используйте код с осторожностью.
+const myPlayerId = "p_" + Math.random().toString(36).slice(2, 10);
 let currentRoomId = "lobby";
 let isPlayMode = false;
 const scene = new THREE.Scene();
